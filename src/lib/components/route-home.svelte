@@ -277,7 +277,7 @@ onDestroy(() => saveCurrentState());
     {/if}
 </div>
 {/key}
-
+<!--
 {#key componentKey2}
 <div class="row">
   <div class="col-6">
@@ -294,4 +294,5 @@ onDestroy(() => saveCurrentState());
   </div>
 </div>
 {/key}
+-->
 </div>
