@@ -42,7 +42,7 @@ This pushes the contents of `build/` to the `gh-pages` branch. Github Pages
 has been configured on the repository to serve the application from;
 
 ```bash
-https://radicleart.github.io/blocksim
+https://trust-machines.github.io/blocksim
 ```
 
 The basic strategy is to deploy the `distribution files` to a branch called `gh-pages` and then configure Github Pages to serve the application from there. Details on Github Pages and Svelte
