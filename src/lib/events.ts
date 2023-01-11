@@ -8,8 +8,12 @@ export function pushEvent(blockId: number, parentId:number, from:BlockState, to:
 	eventList.push(new Event(blockId, parentId, from, to));
 }
 
+export function setEvents(events:EventType[]) {
+	eventList = events;
+}
+
 export function popEvent() {
-	if (eventList.length === 1) throw new Error('Reached initial event');
+	if (eventList.length === 1) throw new Error('Nothing to undo');
 	return eventList.pop();
 }
 

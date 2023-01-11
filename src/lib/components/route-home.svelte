@@ -1,27 +1,24 @@
 <script lang="ts">
-import { getBlocks, undoBlock, clearBlocks } from '../blocks';
-import { popEvent, getEvents, pushEvent, clearEvents } from '../events';
-import { saveState } from '../blockStorage';
+import { restoreSavedState, saveCurrentState, getBlocks, redoLastOperation, undoLastOperation, clearBlocks, freezeBlock, thawBlock, concealBlock, discloseBlock } from '../blocks';
+import logo from '$lib/assets/logo.png';
+import { getEvents } from '../events';
 import Canvas from './canvas/Canvas.svelte';
-import BlockMenu from './BlockMenu.svelte';
-import { ArrowsFullscreen, CloudDownloadFill, ZoomIn, Grid3x2GapFill, ArrowRepeat, ArrowUpLeftCircleFill, FileBarGraphFill } from "svelte-bootstrap-icons";
+import { ArrowUpRightCircleFill, ArrowsFullscreen, CloudDownloadFill, ZoomIn, Grid3x2GapFill, ArrowRepeat, ArrowUpLeftCircleFill, FileBarGraphFill } from "svelte-bootstrap-icons";
 import { onDestroy } from 'svelte';
 import type { BlockType } from "$lib/models/Block";
-import { BlockState } from '$lib/models/Block'
 import { blockStore } from '$lib/stores.js';
 
 let displayMode = 'both';
 let displays = 2;
-let componentKeyA = 0;
-let componentKeyB = 0;
+let componentKey1 = 0;
 let componentKey2 = 0;
-let componentKey3 = 0;
-let targetBlock:BlockType;
 let errorMessage: string|undefined;
+const startWidth = (window.innerWidth - 60) / displays;
+const startHeight = window.innerHeight + 800;
 
 let dimensions = {
-    width: (window.innerWidth - 60) / displays,
-    height: (window.innerHeight - 200)
+    width: startWidth,
+    height: startHeight
 };
 
 let blockSize:number = 80;
@@ -32,56 +29,43 @@ let blockDimensions = { width: 80, height: 80 };
  * @param e
  */
 const handleUpdateCanvas = (e: { detail: any; }) => {
+  errorMessage = undefined;
   const data = e.detail;
   switch(data.opcode) {
     case 'downloadCanvas':
       downloadCanvas(data.canv);
       break;
-    case 'expandCanvas':
-      expandCanvas();
-      break;
-    case 'activateMenu':
-      targetBlock = data.block;
-      componentKey3++;
+    case 'resetLayout':
+      resetLayout();
       break;
     case 'addBlock':
       errorMessage = undefined;
-      targetBlock = data.block;
-      pushEvent(data.block.id, data.block.parentId, BlockState.READY, BlockState.READY);
-      //if (data.blockMode === 'stacks') componentKeyB++;
-      //else if (data.blockMode === 'bitcoin') componentKeyA++;
-      componentKey3++;
       componentKey2++;
-      //componentKeyA++;
-      //componentKeyB++;
       break;
-    case 'freeze':
-      registerNewState(data.block, BlockState.FROZEN);
+    case 'toggleConcealed':
+      registerNewState(data.block, 'toggleConcealed');
       break;
-    case 'thaw':
-      registerNewState(data.block, BlockState.READY);
-      break;
-    case 'conceal':
-      registerNewState(data.block, BlockState.CONCEALED);
-      break;
-    case 'disclose':
-      registerNewState(data.block, BlockState.READY);
+    case 'toggleFrozen':
+      registerNewState(data.block, 'toggleFrozen');
       break;
     case 'stateChangeError':
-        errorMessage = data.e
+      errorMessage = data.e
     default:
-      saveState(getBlocks(), getEvents());
+      //saveCurrentState();
   }
 }
 
-const registerNewState = (block:BlockType, newState:BlockState) => {
+const registerNewState = (block:BlockType, action:string) => {
   try {
     errorMessage = undefined;
-    const startState = block.state;
-    block.changeState(newState);
-    pushEvent(block.id, block.parentId, startState, newState);
+    if (action === 'toggleFrozen') {
+      if (block.frozen) thawBlock(block.id);
+      else freezeBlock(block.id);
+    } else if (action === 'toggleConcealed') {
+      if (block.concealed) discloseBlock(block.id);
+      else concealBlock(block.id);
+    }
     $blockStore = { opcode: 'newState', blockId: block.id };
-    componentKey3++;
     componentKey2++;
   } catch(err:any) {
     errorMessage = err;
@@ -93,29 +77,47 @@ const updateBlockSize = (value:number) => {
   //const scaleRatio = Math.min(dimensions.width/blockSize, dimensions.height/blockSize);
   blockDimensions = { width: (80 * blockSize) / 100, height: (80 * blockSize) / 100 };
   //dimensions = { width: dimensions.width * scaleRatio, height: dimensions.height * scaleRatio };
-  componentKeyA++;
-  componentKeyB++;
+  componentKey1++;
 }
 
-const expandCanvas = () => {
-  dimensions.width = dimensions.width * 1.5;
-  dimensions.height = dimensions.height * 3;
-  componentKeyA++;
-  componentKeyB++;
+const resetLayout = () => {
+  //dimensions.width = dimensions.width * 1.5;
+  errorMessage = undefined;
+  dimensions.height = dimensions.height * 2;
+  $blockStore = { opcode: 'resetLayout', blockId: 0 };
+}
+
+const redraw = () => {
+  errorMessage = undefined;
+  componentKey1++;
   componentKey2++;
-  componentKey3++;
+}
+window.redraw = redraw;
+
+const redoLastBlock = () => {
+  try {
+    errorMessage = undefined;
+    const blockId = redoLastOperation();
+    $blockStore = { opcode: 'redo', blockId: blockId };
+    componentKey2++;
+  } catch(err:any) {
+    errorMessage = err;
+  }
 }
 
 const undoLastBlock = () => {
-  const event = popEvent();
-  undoBlock(event);
-  saveState(getBlocks(), getEvents());
-  $blockStore = { opcode: 'undo', blockId: event.blockId };
-  componentKey2++;
-  componentKey3++;
+  try {
+    errorMessage = undefined;
+    const blockId = undoLastOperation();
+    $blockStore = { opcode: 'undo', blockId: blockId };
+    componentKey2++;
+  } catch(err:any) {
+    errorMessage = err;
+  }
 }
 
 const updateDisplayMode = (value:string) => {
+  errorMessage = undefined;
   displayMode = value;
   displays = 1;
   if (displayMode !== 'both') {
@@ -127,24 +129,33 @@ const updateDisplayMode = (value:string) => {
   } else {
       dimensions.width = (window.innerWidth - 60) / 2;
   }
-  componentKeyA++;
-  componentKeyB++;
+  componentKey1++;
   componentKey2++;
-  componentKey3++;
 }
 
-const restart = () => {
+const restore = () => {
+  errorMessage = undefined;
   dimensions = {
-    width: (window.innerWidth - 60) / displays,
-    height: (window.innerHeight - 200)
+    width: startWidth,
+    height: startHeight
   };
-  saveState(getBlocks(), getEvents());
-  clearBlocks();
-  clearEvents();
-  componentKeyA++;
-  componentKeyB++;
-  componentKey2++;
-  componentKey3++;
+  restoreSavedState();
+  $blockStore = { opcode: 'loadSavedState', blockId: 0 };
+}
+
+const restart = (opcode:string) => {
+  if (opcode === 'reset') {
+    errorMessage = undefined;
+    dimensions = {
+      width: startWidth,
+      height: startHeight
+    };
+    clearBlocks();
+    componentKey1++;
+    componentKey2++;
+  } else {
+    restore();
+  }
 }
 
 const download = (filename:string, data:any) => {
@@ -170,21 +181,15 @@ const downloadJson = () => {
   //let objJsonB64 = base64.encode(utf8.encode(JSON.stringify(getBlocks())));
   //let objJsonB64 = Buffer.from(objJsonStr).toString("base64");
   download('Block Simulation.json', objJsonStr);
-
-	// convert zip file to url object (for anchor tag download)
-	//let blob = await res.blob();
-	//var url = window.URL || window.webkitURL;
-	//let link = url.createObjectURL(blob);
 }
 
-onDestroy(() => saveState(getBlocks(), getEvents()));
+onDestroy(() => saveCurrentState());
 
 </script>
-{#key componentKey3}
 <nav class="navbar navbar-expand-lg navbar-light bg-light" style="width: 100%;">
   <div class="container">
     <a class="navbar-brand" href="/">
-        <img width="50px" src="/img/logo.png" alt="stacks ecosystem dao logo" />
+        <img width="50px" src={logo} alt="stacks ecosystem dao logo" />
     </a>
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
@@ -195,14 +200,25 @@ onDestroy(() => saveState(getBlocks(), getEvents()));
         <li class="nav-item active">
           <a title="Download json" class="nav-link" href="/" on:click|preventDefault={downloadJson}><CloudDownloadFill width={20} height={20}/></a>
         </li>
-        <li class="nav-item active">
-          <a title="Clear and restart" class="nav-link" href="/" on:click|preventDefault={restart}><ArrowRepeat width={20} height={20}/></a>
-        </li>
         <li class="nav-item">
           <a title="Undo last operation" class="nav-link" href="/" on:click|preventDefault={undoLastBlock}><ArrowUpLeftCircleFill width={20} height={20}/></a>
         </li>
         <li class="nav-item">
-          <a title="Expand canvas" class="nav-link" href="/" on:click|preventDefault={expandCanvas}><ArrowsFullscreen width={20} height={20}/></a>
+          <a title="Redo last operation" class="nav-link" href="/" on:click|preventDefault={redoLastBlock}><ArrowUpRightCircleFill width={20} height={20}/></a>
+        </li>
+        <!--
+        <li class="nav-item">
+          <a title="Reset layout" class="nav-link" href="/" on:click|preventDefault={resetLayout}><ArrowsFullscreen width={20} height={20}/></a>
+        </li>
+        -->
+        <li class="nav-item dropdown">
+          <a title="Change layout" class="nav-link dropdown-toggle" href="/" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <ArrowRepeat width={20} height={20}/>
+          </a>
+          <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+            <!-- <a class="dropdown-item" href="/" on:click|preventDefault={() => restart('restart')}>Load Saved State</a>-->
+            <a class="dropdown-item" href="/" on:click|preventDefault={() => restart('reset')}>Reset to Genesis</a>
+          </div>
         </li>
         <li class="nav-item dropdown">
           <a title="Change layout" class="nav-link dropdown-toggle" href="/" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -219,15 +235,11 @@ onDestroy(() => saveState(getBlocks(), getEvents()));
               <ZoomIn width={20} height={20} />
             </a>
             <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-              <a class="dropdown-item" href="/" on:click|preventDefault="{() => {updateBlockSize(20) }}">20%</a>
-              <a class="dropdown-item" href="/" on:click|preventDefault="{() => {updateBlockSize(40) }}">40%</a>
               <a class="dropdown-item" href="/" on:click|preventDefault="{() => {updateBlockSize(60) }}">60%</a>
               <a class="dropdown-item" href="/" on:click|preventDefault="{() => {updateBlockSize(80) }}">80%</a>
               <a class="dropdown-item" href="/" on:click|preventDefault="{() => {updateBlockSize(100) }}">100%</a>
               <a class="dropdown-item" href="/" on:click|preventDefault="{() => {updateBlockSize(120) }}">120%</a>
               <a class="dropdown-item" href="/" on:click|preventDefault="{() => {updateBlockSize(140) }}">140%</a>
-              <a class="dropdown-item" href="/" on:click|preventDefault="{() => {updateBlockSize(160) }}">160%</a>
-              <a class="dropdown-item" href="/" on:click|preventDefault="{() => {updateBlockSize(180) }}">180%</a>
             </div>
         </li>
     </ul>
@@ -240,33 +252,32 @@ onDestroy(() => saveState(getBlocks(), getEvents()));
     </div>
   </div>
 </nav>
+<!--
 <div class="mx-2 d-flex justify-content-around">
   <BlockMenu block={targetBlock} on:doUpdateState={handleUpdateCanvas}/>
 </div>
-{/key}
-
+-->
 <div class="">
 
 <div class="mx-2 d-flex justify-content-around text-danger" style="height: 30px;">
   {#if errorMessage}  {errorMessage} {/if}
 </div>
 
+{#key componentKey1}
 <div id="frame" class="d-flex justify-content-start">
     {#if displayMode === 'both' || displayMode === 'stacks'}
-    {#key componentKeyA}
     <div class="mx-2">
       <Canvas on:doUpdateCanvas={handleUpdateCanvas} blockMode={'stacks'} {dimensions} {blockDimensions}/>
     </div>
-    {/key}
     {/if}
     {#if displayMode === 'both' || displayMode === 'bitcoin'}
-    {#key componentKeyB}
     <div class="mx-2">
         <Canvas on:doUpdateCanvas={handleUpdateCanvas} blockMode={'bitcoin'} {dimensions} {blockDimensions}/>
     </div>
-    {/key}
     {/if}
 </div>
+{/key}
+
 {#key componentKey2}
 <div class="row">
   <div class="col-6">

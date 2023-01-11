@@ -18,7 +18,7 @@ export function saveState(blocks:BlockType[], events:EventType[]) {
 export function getLastState() {
 	const state = localStorage.getItem(STORAGE_KEY)
 	if (state) {
-		return JSON.parse(state)[0].blocks;
+		return JSON.parse(state)[0];
 	}
 }
 

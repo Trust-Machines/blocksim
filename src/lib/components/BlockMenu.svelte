@@ -13,13 +13,13 @@ const doUpdateState = (opcode:string) => {
 
 const allowedTransitions = () => {
   let states = [ { action: 'freeze', label: 'Freeze Node' }, { action: 'thaw', label: 'Thaw Node' }, { action: 'conceal', label: 'Conceal Node' }, { action: 'disclose', label: 'Disclose Node' } ];
-  if (block.state === BlockState.FROZEN) {
+  if (block.frozen) {
     states = states.splice(1, 2);
-  } else if (block.state === BlockState.READY) {
+  } else if (!block.frozen) {
     states = [ { action: 'freeze', label: 'Freeze Node' }, { action: 'conceal', label: 'Conceal Node' } ];
-  } else if (block.state === BlockState.CONCEALED) {
+  } else if (block.concealed) {
     states = [ { action: 'disclose', label: 'Disclose Node' } ];
-  } else if (block.state === BlockState.DISCLOSED) {
+  } else if (!block.concealed) {
     states = [ { action: 'conceal', label: 'Conceal Node' } ];
   }
   return states;

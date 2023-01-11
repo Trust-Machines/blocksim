@@ -2,7 +2,8 @@
 import "../app.scss";
 import {tick, onMount} from 'svelte';
 //import {bootstrap} from 'bootstrap';
-export const prerender = true;
+export const prerender = false;
+export const ssr = false;
 
 let bootstrap: { Tooltip: new (arg0: any) => any; Dropdown: new (arg0: any) => any; };
 let appInitialized:boolean = false;
