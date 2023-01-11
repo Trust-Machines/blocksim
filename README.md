@@ -31,6 +31,9 @@ Note you can preview the production build locally with `npm run preview`.
 
 #### Github Pages
 
+Requires access to github settings and for a branch `gh-pages` to be created from `main`.
+Then run;
+
 ```bash
 node ./gh-pages.js
 ```
