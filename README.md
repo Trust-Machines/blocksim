@@ -42,6 +42,12 @@ has been configured on the repository to serve the application from;
 https://radicleart.github.io/blocksim
 ```
 
+The basic strategy is to deploy the `distribution files` to a branch called `gh-pages` and then configure Github Pages to serve the application from there. Details on Github Pages and Svelte
+applications can be found in these guides.
+
+- [Github Pages how to](https://docs.github.com/en/pages)
+- [Svelte + Github Pages how to](https://github.com/sveltejs/kit/tree/master/packages/adapter-static#spa-mode)
+
 #### Linode / Digital Ocean
 
 Create your preferred target environment (Debian VM + Nginx for example).
