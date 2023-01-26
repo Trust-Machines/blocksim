@@ -1,142 +1,71 @@
-# sbtc-bridge
+# blocksim
 
 ## Introduction
 
-SBTC-Bridge supports trustless swaps of BTC to/from sBTC,
-a [SIP-010](https://github.com/stacksgov/sips/blob/main/sips/sip-010/sip-010-fungible-token-standard.md) compliant fungible token on the Stacks Blockchain that can be used in
-defi protocols, nft marketplace, dao governance and many more applications.
+**Blocksim** is a visualisation and teaching tool for the Stacks blockchain. It helps model the growth
+of the Stacks Blockchain in one of two modes - one to one ratio of Bitcoin to Stacks blocks
+and many or none Stacks Blocks per Bitcoin block.
 
-Non-custodial swaps between Bitcoin and Stacks Blockchains are possible because
-Clarity Smart Contracts have direct read and write access to the Bitcoin chain - Stacks is
-a Bitcoin Layer 2 technology.
+The application has a set of functions which apply to the whole graph and a set of
+controls per block - see the Documentation section below.
 
 ## Development
 
-```bash
-npm install
-npm install sass
-npm run dev
-# or
-npm run dev -- --open
-```
+This is a Github Pages application. See the README on the main branch for build and
+deployment details.
 
-### Deployment
+## Documentation
 
-First build the application;
+### Functions
 
-```bash
-npm run build
-```
+The following function are available in the header;
 
-Note you can preview the production build locally with `npm run preview`.
+- Download: download the chain state to a file in json format
+- Undo: undo the last state change
+- Redo: redo the previous state change
+- Reset: reset chain state back to genesis
+- Mode Toggle: switch between displaying Bitcoin, Stacks and Both modes
+- Zoom: change the magnification of the tree
 
-#### Github Pages
+Blocks can be moved by click and drag. Movement is currently constrained to a
+horizontal plane as moving the blocks vertically can break the fundamental principals, this
+said a small vertical movement is allowed. Children nodes follow the movement of parents
+but not the other way around.
 
-Requires access to github settings and for a branch `gh-pages` to be created from `main`.
-Then run;
+### Block Controls
 
-```bash
-node ./gh-pages.js
-```
+Button controls on each block;
 
-This pushes the contents of `build/` to the `gh-pages` branch. Github Pages
-has been configured on the repository to serve the application from;
+- H - Highlight ancestors and descendant's - click once to highlight click twice to reset or click and hold - changes the subtree block colour to purple.
+- T/F - click to toggle Freeze/Thaw block - mining is prevented when block is frozen - changes block colour to light blue / cyan.
+- C/D - click to toggle Concealed/Disclosed - changes the block colour to white, does not change mining rules etc atm.
+- M - click to mine a block. a block will be added to the tree. Throws error if business rules don't allow mining from this block.
 
-```bash
-https://trust-machines.github.io/sbtc-bridge
-```
+These rules governing these states are subject to change. For current release;
 
-The basic strategy is to deploy the `distribution files` to a branch called `gh-pages` and then configure Github Pages to serve the application from there. Details on Github Pages and Svelte
-applications can be found in these guides.
+1. By default mining is allowed from the two most recent blocks.
+2. Concealing / disclosing has not yet been implemented (just a block colour change atm).
+3. Freezing / thawing a block overrides the default mining behaviour.
 
-- [Github Pages how to](https://docs.github.com/en/pages)
-- [Svelte + Github Pages how to](https://github.com/sveltejs/kit/tree/master/packages/adapter-static#spa-mode)
+Clean separation between business and UI logic allows the commands to be driven by simple API commands.
 
-#### Linode / Digital Ocean
+### Business Model API
 
-Create your preferred target environment (Debian VM + Nginx for example).
-Update the deploy script with your config and add your public ssh key to known hosts.
-Then run;
+See src/lib/blocks.ts
 
-```bash
-bash ./deploy-remote.sh
-```
+- window.mineBlock(id) // mines a new block given the given parent id or throws error
+- window.freezeBlock(id) // freezes the given block or throws error
+- window.thawBlock (id) // thaws the given block or throws error
+- window.concealBlock (id) // conceals the given block or throws error
+- window.discloseBlock(id) // discloses the given block or throws error
+- window.setMinableBlocks() // resets the the mining rules to the default - overwrites existing state
+- window.setBlocks([]:BlockType) // sets the block state from a list of blocks
+- window.undoLastOperation // undo last operation
+- window.redoLastOperation // not yet implemented
+- window.clearBlocks() // clears blocks
 
-### Packaging
+### User Interface API
 
-The application can be packaged and uploaded to the npm registry;
+See src/lib/components/route-home.svelte
 
-```bash
-./node_modules/.bin/svelte-kit package
-cd package
-npm publish
-```
-
-## Bundling bitcoinjs-lib
-
-This application ports the Bitcoinjs library by polyfilling nodejs dependencies. For
-Details see 1 below. Bitcoin js can also be bundled using browserify. This is an older and
-more clunky - details below.
-
-### 1. Polyfill
-
-The main issue is configuring vite to polyfill the required nodejs dependencies. This
-has to be done in both the development and production build environments. The various
-legacy modules and dependencies and the number of circular dependencies together with the
-fact tha the nodejs module mechanics differ from those of the client side code means
-its just not easy!
-The following came close to successfully polyfilling Buffer into bitcoinjs
-[Polyfill Node.js built-in modules with Vite](https://medium.com/@ftaioli/using-node-js-builtin-modules-with-vite-6194737c2cd2). But even with excellent guides
-like this there may be slight differences and a problem persisted in the development
-build environment.
-
-```bash
-npm install bitcoinjs-lib browserify uglify-es
-```
-
-### 2. Pre-Compiling Bitcoinjs Module
-
-See [How to Browserify](https://github.com/bitcoinjs/bitcoinjs-lib/issues/965).
-
-Following the advice here (after uninstalling/re-installing browserify) led to
-a javascript module.
-
-Get correct browserify by checking and sym linking;
-
-```bash
-npm install -g browserify
-npm install -g uglify-es
-/Users/mikey/.nvm/versions/node/v16.14.2/bin/browserify --version
-ln -s /Users/mikey/.nvm/versions/node/v16.14.2/bin/browserify /usr/local/bin/browserify
-```
-
-Download the latest tag of bitcoinjs;
-
-```bash
-git clone git@github.com:bitcoinjs/bitcoinjs-lib.git
-cd bitcoinjs-lib
-git fetch --all
-git checkout f221e1f7ac01c11b715e3398e04514a7df64ae42
-npm install
-```
-
-Bundle the library and its dependencies;
-
-```bash
-browserify -r . --standalone bitcoinjs > bitcoinjs.js
-uglifyjs -c --mangle reserved=['BigInteger','ECPair','Point'] bitcoinjs.js > bitcoinjs.min.js
-```
-
-Svelte configuration;
-
-```bash
-cp bitcoinjs.* ../multisig-svelte/static/public
-```
-
-in app.html add
-
-```bash
-<script src="%sveltekit.assets%/public/bitcoinjs.js"></script>
-```
-
-Note this will be bitcoinjs.min.js in production.
+- window.redraw() - e.g. syncs the ui state with the model
